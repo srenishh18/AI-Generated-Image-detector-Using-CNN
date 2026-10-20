@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI-Generated Image Detector (CNN)</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    
+    <!-- Header -->
+    <header>
+      <div class="logo-area">
+        <div class="logo-icon">🧠</div>
+        <div>
+          <h1>AI Image Detector</h1>
+          <p style="font-size: 0.85rem; color: var(--text-secondary);">Convolutional Neural Network (PyTorch)</p>
+        </div>
+      </div>
+      <div class="status-badge">
+        <span class="status-dot"></span>
+        <span id="modelStatus">CNN Active</span>
+      </div>
+    </header>
+
+    <!-- Main Workspace Grid -->
+    <main class="main-grid">
+      
+      <!-- Input Card -->
+      <section class="card">
+        <h2 class="card-title">📷 Select Image</h2>
+        
+        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+          <div class="upload-icon">📁</div>
+          <div class="upload-text">
+            <p><strong>Click to browse</strong> or drag & drop image here</p>
+            <p style="margin-top: 6px;">Supports JPG, PNG, WEBP, BMP</p>
+          </div>
+          <input type="file" id="fileInput" accept="image/*">
+        </div>
+
+        <div class="preview-container" id="previewContainer">
+          <img id="imagePreview" src="" alt="Image Preview">
+        </div>
+
+        <button class="btn-primary" id="analyzeBtn" onclick="analyzeImage()" disabled>
+          Analyze Image
+        </button>
+      </section>
+
+      <!-- Output Card -->
+      <section class="card">
+        <h2 class="card-title">📊 Classification Result</h2>
+        
+        <div class="result-box" id="resultBox">
+          <div class="placeholder-state" id="placeholderState">
+            <div class="placeholder-icon">🔍</div>
+            <p>Upload an image to see if it is <strong>Real</strong> or <strong>AI-Generated</strong> along with confidence score.</p>
+          </div>
+
+          <div id="activeResult" style="display: none; width: 100%;">
+            <div class="badge-result" id="resultBadge">AI-GENERATED IMAGE</div>
+            
+            <p style="color: var(--text-secondary); font-size: 0.9rem;">Confidence Score</p>
+            <p style="font-size: 2.2rem; font-weight: 700; margin: 4px 0 16px 0;" id="confidenceScore">0.0%</p>
+
+            <div class="meter-container">
+              <div class="meter-labels">
+                <span style="color: var(--accent-ai);">AI Probability (<span id="aiProbText">0%</span>)</span>
+                <span style="color: var(--accent-real);">Real Probability (<span id="realProbText">0%</span>)</span>
+              </div>
+              <div class="meter-bar-bg">
+                <div class="meter-bar-fill" id="meterFill"></div>
+              </div>
+            </div>
+
+            <div class="probability-scores">
+              <div class="score-card">
+                <p style="font-size: 0.8rem; color: var(--text-secondary);">AI Score</p>
+                <div class="score-val" style="color: var(--accent-ai);" id="aiScoreVal">0.0%</div>
+              </div>
+              <div class="score-card">
+                <p style="font-size: 0.8rem; color: var(--text-secondary);">Real Score</p>
+                <div class="score-val" style="color: var(--accent-real);" id="realScoreVal">0.0%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const uploadZone = document.getElementById('uploadZone');
+    const previewContainer = document.getElementById('previewContainer');
+    const imagePreview = document.getElementById('imagePreview');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+
+    let selectedFile = null;
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      uploadZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        uploadZone.classList.add('dragover');
+      }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      uploadZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+      }, false);
+    });
+
+    uploadZone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        fileInput.files = files;
+        handleFileSelect(files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleFileSelect(e.target.files[0]);
+      }
+    });
+
+    function handleFileSelect(file) {
+      selectedFile = file;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        imagePreview.src = e.target.result;
+        previewContainer.style.display = 'block';
+        analyzeBtn.disabled = false;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function analyzeImage() {
+      if (!selectedFile) return;
+
+      analyzeBtn.disabled = true;
+      analyzeBtn.innerHTML = '<span class="spinner"></span> Running CNN...';
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      try {
+        const response = await fetch('/predict', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          displayResult(data);
+        } else {
+          alert('Prediction error: ' + (data.error || 'Failed to classify image'));
+        }
+      } catch (err) {
+        alert('Server request failed: ' + err.message);
+      } finally {
+        analyzeBtn.disabled = false;
+        analyzeBtn.innerHTML = 'Analyze Image';
+      }
+    }
+
+    function displayResult(data) {
+      document.getElementById('placeholderState').style.display = 'none';
+      document.getElementById('activeResult').style.display = 'block';
+
+      const badge = document.getElementById('resultBadge');
+      const meterFill = document.getElementById('meterFill');
+
+      if (data.is_ai) {
+        badge.className = 'badge-result badge-ai';
+        badge.textContent = '🤖 AI-GENERATED IMAGE';
+        meterFill.className = 'meter-bar-fill fill-ai';
+      } else {
+        badge.className = 'badge-result badge-real';
+        badge.textContent = '🌿 REAL IMAGE';
+        meterFill.className = 'meter-bar-fill fill-real';
+      }
+
+      document.getElementById('confidenceScore').textContent = data.confidence + '%';
+      document.getElementById('aiProbText').textContent = data.ai_probability + '%';
+      document.getElementById('realProbText').textContent = data.real_probability + '%';
+      document.getElementById('aiScoreVal').textContent = data.ai_probability + '%';
+      document.getElementById('realScoreVal').textContent = data.real_probability + '%';
+
+      meterFill.style.width = data.ai_probability + '%';
+    }
+  </script>
+</body>
+</html>
