@@ -1,2 +1,25 @@
 /PPT_PRESENTATION_GUIDE.md
 /PROJECT.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments and local secrets
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Local datasets and trained model weights
+/dataset/
+/best_model.pth
+
+# Local tooling and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
